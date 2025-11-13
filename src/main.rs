@@ -8,12 +8,12 @@ use std::io::Write;
 use std::io::BufReader;
 use std::io::BufRead;
 
+use std::net::TcpListener;
+use std::net::TcpStream;
+
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::File;
-
-use std::net::TcpListener;
-use std::net::TcpStream;
 
 mod line_parser;
 
