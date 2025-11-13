@@ -1,6 +1,7 @@
-pub fn get_all(input: &str) -> Vec<&str> {
+pub fn get_first(input: &str) -> &str {
     return input.lines()
-        .collect();
+        .next()
+        .unwrap();
 }
 
 pub fn get_parts(line: &str) -> Vec<&str> {

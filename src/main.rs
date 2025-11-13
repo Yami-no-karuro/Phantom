@@ -41,45 +41,14 @@ fn handle_request(
     let request: String = String::from_utf8_lossy(&request_buffer[..])
         .to_string();
     
-    let request_lines: Vec<&str> = line_parser::get_all(&request);
-    let request_line_parts: Vec<&str> = line_parser::get_parts(&request_lines[0]);
+    let request_line: &str = line_parser::get_first(&request);
+    let request_line_parts: Vec<&str> = line_parser::get_parts(request_line);
 
     // GET /api/v1/example HTTP/1.1\r\n
     // [0][Method] [1][Path] ...
     // [0][GET]    [1][/api/v1/example] ...
     let request_method: &str = request_line_parts[0];
     let request_path: &str = request_line_parts[1];
-
-    let mut request_body: String = String::new();
-    let mut request_headers: HashMap<String, String> = HashMap::new();
-    let mut is_body: bool = false;
-
-    for line in &request_lines[1..] {
-        if line.is_empty() {
-            is_body = true;
-            continue;
-        }
-
-        if is_body {
-            request_body.push_str(line);
-            request_body.push('\n');
-        } else {
-            
-            // Request headers format should always be <key>: <value>, such as "Connection: keep-alive", so we first look for the ":" separator
-            // and than we eventually extract values accordingly.
-            if let Some(pos) = line.find(':') {
-                let key: String = line[..pos]
-                    .trim()
-                    .to_string();
-                
-                let value: String = line[pos + 1..]
-                    .trim()
-                    .to_string();
-                
-                request_headers.insert(key, value);
-            }
-        }
-    }
 
     if sp_map.contains_key(request_path) {
         println!("Request ([{}] - {}) has been blocked. Request path scored positive in the sensitive path database.", request_method, request_path);
