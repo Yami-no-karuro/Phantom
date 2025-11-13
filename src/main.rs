@@ -12,18 +12,26 @@ use std::collections::HashMap;
 mod line_parser;
 mod source_loader;
 
-const REQUEST_BUFF: usize = 4096;
-const RESPONSE_BUFF: usize = 4096;
+const REQUEST_BUFF: usize = 2048;
+const RESPONSE_BUFF: usize = 2048;
 
 fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> Result<(), io::Error> {
-    // The reading procedure should be executed in loop context, until req_size is 0.
-    // The "read" method only pulls **some** bytes in to the buffer, but for our purposes this will be more than enough.
-    let mut request_buffer: [u8; REQUEST_BUFF] = [0; REQUEST_BUFF];
-    let req_size: usize = stream.read(&mut request_buffer)?;
+    let mut request_buffer: Vec<u8> = Vec::new();
+    let mut chunk: [u8; REQUEST_BUFF] = [0; REQUEST_BUFF];
 
-    let request: String = String::from_utf8_lossy(&request_buffer[..])
-        .to_string();
+    loop {
+        let bytes_read: usize = stream.read(&mut chunk)?;
+        if bytes_read == 0 {
+            break;
+        }
+        
+        request_buffer.extend_from_slice(&chunk[..bytes_read]);
+        if bytes_read < REQUEST_BUFF {
+            break;
+        }
+    }
 
+    let request: String = String::from_utf8_lossy(&request_buffer[..]).to_string();
     let request_lines: Vec<&str> = line_parser::get_all(&request);
     let request_line_parts: Vec<&str> = line_parser::get_parts(&request_lines[0]);
 
@@ -43,9 +51,6 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
             continue;
         }
 
-        // Host: foo.bar\r\nContent-Type: application/json...\r\n\r\n
-        // An empty line separates the headers from the actual request body.
-        // When encountered, content starts to be pushed to the request_body variable.
         if is_body {
             request_body.push_str(line);
             request_body.push('\n');
@@ -53,27 +58,36 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
             request_headers.push(line);
         }
     }
-    
+
     if sp_map.contains_key(request_path) {
         println!("Request ([{}] - {}) was blocked!", request_method, request_path);
-        
+
         let response: &str = "HTTP/1.1 401 Forbidden\r\n\r\n";
         stream.write_all(response.as_bytes())?;
         stream.flush()?;
         return Ok(());
     }
-    
-    let mut proxy_stream = TcpStream::connect("127.0.0.1:8080")?;
-    proxy_stream.write_all(&request_buffer[..req_size])?;
-    proxy_stream.flush()?;
-   
-    // Same case as above...
-    // The reading procedure should be executed in loop context, until res_size is 0.
-    // The "read" method only pulls **some** bytes in to the buffer, but for our purposes this will be more than enough.
-    let mut response_buffer: [u8; RESPONSE_BUFF] = [0; RESPONSE_BUFF];
-    let res_size: usize = proxy_stream.read(&mut response_buffer)?;
 
-    stream.write_all(&response_buffer[..res_size])?;
+    let mut proxy_stream: TcpStream = TcpStream::connect("127.0.0.1:8080")?;
+    proxy_stream.write_all(&request_buffer)?;
+    proxy_stream.flush()?;
+
+    let mut response_buffer: Vec<u8> = Vec::new();
+    let mut res_chunk: [u8; RESPONSE_BUFF] = [0; RESPONSE_BUFF];
+
+    loop {
+        let bytes_read: usize = proxy_stream.read(&mut res_chunk)?;
+        if bytes_read == 0 {
+            break;
+        }
+        
+        response_buffer.extend_from_slice(&res_chunk[..bytes_read]);
+        if bytes_read < RESPONSE_BUFF {
+            break;
+        }
+    }
+
+    stream.write_all(&response_buffer)?;
     stream.flush()?;
     return Ok(());
 }
@@ -91,7 +105,7 @@ fn main() {
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
 
-    // We use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map across threads.
+    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map across threads.
     // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
     // and we don't have to protect ourselves from race-conditions.
     let sp_map: HashMap<String, bool> = source_loader::load_source("source/sensitive-paths.txt").unwrap();
