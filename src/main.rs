@@ -5,33 +5,17 @@ use std::process;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::io::BufReader;
-use std::io::BufRead;
 
 use std::net::TcpListener;
 use std::net::TcpStream;
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::fs::File;
 
 mod line_parser;
+mod source_loader;
 
 const REQUEST_BUFF: usize = 4096;
-
-fn load_source(path: &str) -> Result<HashMap<String, bool>, io::Error> {
-    let file: File = File::open(&path)?;
-    let reader = BufReader::new(file);
-
-    // The source file must contain a single value per row.
-    // The lookup table maps the smallest possible value on the left, only for low-complexity search purposes.
-    let mut hashmap: HashMap<String, bool> = HashMap::new();
-    for line in reader.lines() {
-        hashmap.insert(line?, true);
-    }
-
-    return Ok(hashmap);
-}
 
 fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> Result<(), io::Error> {
     let mut request_buffer: [u8; 4096] = [0; REQUEST_BUFF];
@@ -97,7 +81,7 @@ fn main() {
 
     // We use Arc (Atomically Reference Counted) to share sp_map across threads.
     // This is required, although we don't need Mutex and locks because we're in read-only context and we don't have to protect ourselves from race-conditions.
-    let sp_map: HashMap<String, bool> = load_source("source/sensitive-paths.txt").unwrap();
+    let sp_map: HashMap<String, bool> = source_loader::load_source("source/sensitive-paths.txt").unwrap();
     let shared_sp_map = Arc::new(sp_map);
 
     println!("Phantom listening on port: {}.", port);
