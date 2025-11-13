@@ -14,6 +14,7 @@ mod source_loader;
 
 const REQUEST_BUFF: usize = 2048;
 const RESPONSE_BUFF: usize = 2048;
+const FUZZLIST_PATH: &str = "source/fuzzlist.txt";
 
 fn handle_request(
     mut stream: TcpStream, 
@@ -102,7 +103,9 @@ fn main() {
     // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map across threads.
     // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
     // and we don't have to worry about race-conditions.
-    let sp_map: HashMap<String, bool> = source_loader::load_source("source/sensitive-paths.txt").unwrap();
+    let sp_map: HashMap<String, bool> = source_loader::load_source(FUZZLIST_PATH)
+        .unwrap();
+    
     let shared_sp_map: Arc<HashMap<String, bool>> = Arc::new(sp_map);
     let forward_to: Arc<String> = Arc::new(forward_to.to_string());
 
