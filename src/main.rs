@@ -51,7 +51,7 @@ fn handle_request(
     let request_path: &str = request_line_parts[1];
 
     let mut request_body: String = String::new();
-    let mut request_headers: Vec<&str> = Vec::new();
+    let mut request_headers: HashMap<String, String> = HashMap::new();
     let mut is_body: bool = false;
 
     for line in &request_lines[1..] {
@@ -64,7 +64,20 @@ fn handle_request(
             request_body.push_str(line);
             request_body.push('\n');
         } else {
-            request_headers.push(line);
+            
+            // Request headers format should always be <key>: <value>, such as "Connection: keep-alive", so we first look for the ":" separator
+            // and than we eventually extract values accordingly.
+            if let Some(pos) = line.find(':') {
+                let key: String = line[..pos]
+                    .trim()
+                    .to_string();
+                
+                let value: String = line[pos + 1..]
+                    .trim()
+                    .to_string();
+                
+                request_headers.insert(key, value);
+            }
         }
     }
 
