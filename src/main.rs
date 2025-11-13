@@ -64,7 +64,7 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
     }
 
     if sp_map.contains_key(request_path) {
-        println!("Request ([{}] - {}) has been blocked. Found positive in the sensitive path database.", request_method, request_path);
+        println!("Request ([{}] - {}) has been blocked. Request path scored positive in the sensitive path database.", request_method, request_path);
 
         let response: &str = "HTTP/1.1 401 Forbidden\r\n\r\n";
         stream.write_all(response.as_bytes())?;
@@ -102,7 +102,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         eprintln!("Error: \"Invalid arguments!\"");
-        eprintln!("Usage: \"{} <port>\"", args[0]);
+        eprintln!("Usage: \"{} <port> <forward_to>\"", args[0]);
         process::exit(1);
     }
 
