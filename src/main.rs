@@ -15,7 +15,12 @@ mod source_loader;
 const REQUEST_BUFF: usize = 2048;
 const RESPONSE_BUFF: usize = 2048;
 
-fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> Result<(), io::Error> {
+fn handle_request(
+    mut stream: TcpStream, 
+    forward_to: Arc<String>, 
+    sp_map: Arc<HashMap<String, bool>>
+) -> Result<(), io::Error> {
+    
     // The request stream has to be read inside a loop because the 
     // TcpStream::[read](https://doc.rust-lang.org/std/net/struct.TcpStream.html#impl-Read-for-%26TcpStream) implementation
     // only pulls **some** bytes in to the buffer, so we should repeat the process until bytes is 0.
@@ -72,7 +77,7 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
         return Ok(());
     }
 
-    let mut proxy_stream: TcpStream = TcpStream::connect("127.0.0.1:8080")?;
+    let mut proxy_stream: TcpStream = TcpStream::connect(&*forward_to)?;
     proxy_stream.write_all(&request_buffer)?;
     proxy_stream.flush()?;
 
@@ -100,13 +105,14 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
+    if args.len() != 3 {
         eprintln!("Error: \"Invalid arguments!\"");
         eprintln!("Usage: \"{} <port> <forward_to>\"", args[0]);
         process::exit(1);
     }
 
     let port: &str = &args[1];
+    let forward_to: &str = &args[2];
     let address: String = format!("127.0.0.1:{}", port);
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
@@ -115,15 +121,20 @@ fn main() {
     // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
     // and we don't have to worry about race-conditions.
     let sp_map: HashMap<String, bool> = source_loader::load_source("source/sensitive-paths.txt").unwrap();
-    let shared_sp_map = Arc::new(sp_map);
+    let shared_sp_map: Arc<HashMap<String, bool>> = Arc::new(sp_map);
+    let forward_to: Arc<String> = Arc::new(forward_to.to_string());
 
-    println!("Phantom listening on port: {}.", port);
+    println!("Phantom will be available soon!");
+    println!("127.0.0.1:{} -> {}", port, forward_to);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        let shared_sp_map_clone = Arc::clone(&shared_sp_map);
+        
+        let shared_sp_map_clone: Arc<HashMap<String, bool>> = Arc::clone(&shared_sp_map);
+        let forward_to_clone: Arc<String> = Arc::clone(&forward_to);
+        
         thread::spawn(move || {
-            if let Err(e) = handle_request(stream, shared_sp_map_clone) {
+            if let Err(e) = handle_request(stream, forward_to_clone, shared_sp_map_clone) {
                 eprintln!("Error: \"{}\".", e);
             }
         });
