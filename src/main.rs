@@ -95,6 +95,8 @@ fn main() {
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
 
+    // We use Arc (Atomically Reference Counted) to share sp_map across threads.
+    // This is required, although we don't need Mutex and locks because we're in read-only context and we don't have to protect ourselves from race-conditions.
     let sp_map: HashMap<String, bool> = load_source("source/sensitive-paths.txt").unwrap();
     let shared_sp_map = Arc::new(sp_map);
 
