@@ -70,9 +70,11 @@ fn handle_request(mut stream: TcpStream, sp_map: Arc<HashMap<String, bool>>) -> 
         }
     }
 
+    println!("[{}] - {}", request_method, request_path);
     let mut response: &str = "HTTP/1.1 200 OK\r\n\r\n";
+
+    let sensitive_paths_map: HashMap<String, bool> = load_source("source/sensitive-paths.txt")?;
     if sp_map.contains_key(request_path) {
-        println!("Request ([{}] - {}) was blocked!", request_method, request_path);
         response = "HTTP/1.1 401 Forbidden\r\n\r\n";
     }
 
@@ -95,16 +97,12 @@ fn main() {
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
 
-    let sp_map: HashMap<String, bool> = load_source("source/sensitive-paths.txt").unwrap();
-    let shared_sp_map = Arc::new(sp_map);
-
     println!("Phantom listening on port: {}.", port);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        let shared_sp_map_clone = Arc::clone(&shared_sp_map);
         thread::spawn(move || {
-            if let Err(e) = handle_request(stream, shared_sp_map_clone) {
+            if let Err(e) = handle_request(stream) {
                 eprintln!("Error: \"{}\".", e);
             }
         });
