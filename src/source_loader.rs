@@ -9,7 +9,7 @@ pub fn load_source(path: &str) -> Result<HashMap<String, bool>, io::Error> {
     let reader = BufReader::new(file);
 
     // The source file must contain a single value per row.
-    // The lookup table maps the smallest possible value on the left, only for low-complexity search purposes.
+    // We'll use the HashMap lookup strategy to lower the complexity to O(1).
     let mut hashmap: HashMap<String, bool> = HashMap::new();
     for line in reader.lines() {
         hashmap.insert(line?, true);
