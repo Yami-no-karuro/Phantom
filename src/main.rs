@@ -60,7 +60,8 @@ fn handle_request(
         return Ok(());
     }
 
-    let mut proxy_stream: TcpStream = TcpStream::connect(&*forward_to)?;
+    let proxy: String = format!("127.0.0.1:{}", &*forward_to);
+    let mut proxy_stream: TcpStream = TcpStream::connect(proxy)?;
     proxy_stream.write_all(&request_buffer)?;
     proxy_stream.flush()?;
 
@@ -100,7 +101,7 @@ fn main() {
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
 
-    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map and forward_to across threads.
+    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share **sp_map** and **forward_to** across threads.
     // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
     // and we don't have to worry about race-conditions.
     let sp_map: HashMap<String, bool> = source_loader::load_source(FUZZLIST_PATH)
@@ -110,7 +111,7 @@ fn main() {
     let forward_to: Arc<String> = Arc::new(forward_to.to_string());
 
     println!("Phantom proxy will be available soon!");
-    println!("127.0.0.1:{} -> {}", port, forward_to);
+    println!("[127.0.0.1:{} -> 127.0.0.1:{}]", port, forward_to);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
