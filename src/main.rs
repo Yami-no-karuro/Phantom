@@ -12,33 +12,38 @@ use std::collections::HashMap;
 mod line_parser;
 mod source_loader;
 
-const REQUEST_BUFF: usize = 2048;
-const RESPONSE_BUFF: usize = 2048;
+const BUFF_SIZE: usize = 2048;
 const FUZZLIST_PATH: &str = "source/fuzzlist.txt";
+
+fn read_to_buff(
+    mut stream: &TcpStream, 
+    buff: &mut Vec<u8>
+) -> Result<(), io::Error> 
+{
+    let mut chunk: [u8; BUFF_SIZE] = [0; BUFF_SIZE];
+    loop {
+        let bytes: usize = stream.read(&mut chunk)?;
+        if bytes == 0 { 
+            break; 
+        }
+        
+        buff.extend_from_slice(&chunk[..bytes]);
+        if bytes < BUFF_SIZE { 
+            break; 
+        }
+    }
+    
+    return Ok(());
+}
 
 fn handle_request(
     mut stream: TcpStream, 
     forward_to: Arc<String>, 
     sp_map: Arc<HashMap<String, bool>>
-) -> Result<(), io::Error> {
-    
-    // The request stream has to be read inside a loop because the 
-    // TcpStream::[read](https://doc.rust-lang.org/std/net/struct.TcpStream.html#impl-Read-for-%26TcpStream) implementation
-    // only pulls **some** bytes in to the buffer, so we should repeat the process until bytes is 0.
+) -> Result<(), io::Error> 
+{
     let mut request_buffer: Vec<u8> = Vec::new();
-    let mut chunk: [u8; REQUEST_BUFF] = [0; REQUEST_BUFF];
-    loop {
-        let bytes: usize = stream.read(&mut chunk)?;
-        if bytes == 0 {
-            break;
-        }
-        
-        request_buffer.extend_from_slice(&chunk[..bytes]);
-        if bytes < REQUEST_BUFF {
-            break;
-        }
-    }
-
+    read_to_buff(&stream, &mut request_buffer)?;
     let request: String = String::from_utf8_lossy(&request_buffer[..])
         .to_string();
     
@@ -52,7 +57,7 @@ fn handle_request(
     let request_path: &str = request_line_parts[1];
 
     if sp_map.contains_key(request_path) {
-        println!("Request ([{}] - {}) has been blocked. Request path scored positive in the sensitive path database.", request_method, request_path);
+        println!("Request ([{}] - {}) has been blocked.", request_method, request_path);
 
         let response: &str = "HTTP/1.1 401 Forbidden\r\n\r\n";
         stream.write_all(response.as_bytes())?;
@@ -65,29 +70,16 @@ fn handle_request(
     proxy_stream.write_all(&request_buffer)?;
     proxy_stream.flush()?;
 
-    // The response from the proxy stream has to be read inside a loop because the 
-    // TcpStream::[read](https://doc.rust-lang.org/std/net/struct.TcpStream.html#impl-Read-for-%26TcpStream) implementation
-    // only pulls **some** bytes in to the buffer, so we should repeat the process until bytes is 0.
     let mut response_buffer: Vec<u8> = Vec::new();
-    let mut res_chunk: [u8; RESPONSE_BUFF] = [0; RESPONSE_BUFF];
-    loop {
-        let bytes: usize = proxy_stream.read(&mut res_chunk)?;
-        if bytes == 0 {
-            break;
-        }
-        
-        response_buffer.extend_from_slice(&res_chunk[..bytes]);
-        if bytes < RESPONSE_BUFF {
-            break;
-        }
-    }
+    read_to_buff(&proxy_stream, &mut response_buffer)?;
 
     stream.write_all(&response_buffer)?;
     stream.flush()?;
     return Ok(());
 }
 
-fn main() {
+fn main() 
+{
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
         eprintln!("Error: \"Invalid arguments!\"");
@@ -100,13 +92,10 @@ fn main() {
     let address: String = format!("127.0.0.1:{}", port);
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
-
-    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share **sp_map** and **forward_to** across threads.
-    // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
-    // and we don't have to worry about race-conditions.
+    
     let sp_map: HashMap<String, bool> = source_loader::load_source(FUZZLIST_PATH)
         .unwrap();
-    
+
     let shared_sp_map: Arc<HashMap<String, bool>> = Arc::new(sp_map);
     let forward_to: Arc<String> = Arc::new(forward_to.to_string());
 
@@ -114,8 +103,7 @@ fn main() {
     println!("[127.0.0.1:{} -> 127.0.0.1:{}]", port, forward_to);
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        
+        let stream: TcpStream = stream.unwrap();
         let shared_sp_map_clone: Arc<HashMap<String, bool>> = Arc::clone(&shared_sp_map);
         let forward_to_clone: Arc<String> = Arc::clone(&forward_to);
         
