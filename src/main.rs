@@ -28,13 +28,13 @@ fn handle_request(
     let mut request_buffer: Vec<u8> = Vec::new();
     let mut chunk: [u8; REQUEST_BUFF] = [0; REQUEST_BUFF];
     loop {
-        let bytes_read: usize = stream.read(&mut chunk)?;
-        if bytes_read == 0 {
+        let bytes: usize = stream.read(&mut chunk)?;
+        if bytes == 0 {
             break;
         }
         
-        request_buffer.extend_from_slice(&chunk[..bytes_read]);
-        if bytes_read < REQUEST_BUFF {
+        request_buffer.extend_from_slice(&chunk[..bytes]);
+        if bytes < REQUEST_BUFF {
             break;
         }
     }
@@ -100,7 +100,7 @@ fn main() {
     let listener: TcpListener = TcpListener::bind(address)
         .unwrap();
 
-    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map across threads.
+    // We need to use [Arc](https://doc.rust-lang.org/std/sync/struct.Arc.html) to share sp_map and forward_to across threads.
     // This is required, but we don't need [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) and locks because we're in read-only context 
     // and we don't have to worry about race-conditions.
     let sp_map: HashMap<String, bool> = source_loader::load_source(FUZZLIST_PATH)
