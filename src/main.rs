@@ -12,7 +12,7 @@ use std::collections::HashMap;
 mod line_parser;
 mod source_loader;
 
-const BUFF_SIZE: usize = 2048;
+const BUFF_SIZE: usize = 256;
 const FUZZLIST_PATH: &str = "source/fuzzlist.txt";
 
 fn read_to_buff(
