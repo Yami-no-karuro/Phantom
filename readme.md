@@ -26,5 +26,6 @@ It serves to illustrate the basic functionality of a security-focused **proxy mi
 
 - Make sure to have the [Rust](https://rust-lang.org/) programming language installed on your machine.
 - Clone the [Repository](https://github.com/Yami-no-karuro/Phantom.git).
-- Build and run the project via `cargo run <proxy> <forward-to>`.
-- Navigate to `http://localhost:<forward-to>/` on your browser.
+- Launch the **example** HTML page via `python3 -m http.server 8080` inside the `/example` directory.
+- Build and run the project via `cargo run 5000 8080`.
+- Navigate [localhost](http://localhost:5000) on your browser.
