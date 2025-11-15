@@ -99,7 +99,7 @@ fn main()
     let shared_sp_map: Arc<HashMap<String, bool>> = Arc::new(sp_map);
     let forward_to: Arc<String> = Arc::new(forward_to.to_string());
 
-    println!("Phantom proxy will be available soon!");
+    println!("Phantom Proxy will be available soon!");
     println!("[127.0.0.1:{} -> 127.0.0.1:{}]", port, forward_to);
 
     for stream in listener.incoming() {
